@@ -6,7 +6,7 @@ import seaborn as sns
 import os
 
 # -------------------- LOAD DATA -------------------- #
-file_path = "bike_cleaned.xlsx"  # Change this if needed
+file_path = "bike_cleaned.xlsx"  # Change if needed
 file_ext = os.path.splitext(file_path)[1].lower()
 
 try:
@@ -29,20 +29,27 @@ df.columns = df.columns.str.strip()
 for c in df.select_dtypes(include=['object']).columns:
     df[c] = df[c].astype(str).str.strip().str.replace('"','').str.replace("'",'')
 
-# Rename Kerb Weight for consistency
-if 'Kerb Weight kg' in df.columns:
-    df.rename(columns={'Kerb Weight kg':'Kerb Weight mm'}, inplace=True)
+# -------------------- HANDLE KERB WEIGHT -------------------- #
+if 'Kerb Weight mm' in df.columns:
+    df.rename(columns={'Kerb Weight mm':'Kerb Weight'}, inplace=True)
+elif 'Kerb Weight kg' in df.columns:
+    df.rename(columns={'Kerb Weight kg':'Kerb Weight'}, inplace=True)
+elif 'Kerb Weight' in df.columns:
+    pass
+else:
+    st.error("Kerb Weight column not found in dataset!")
+    st.stop()
 
+# -------------------- NUMERIC CLEANING -------------------- #
 numeric_cols = [
     'Price (Rs)','Engine Displacement','Max power PS','Max power RPM',
-    'Max Torque By Nm','Max Torque RPM','Kerb Weight mm','Seat Height mm',
+    'Max Torque By Nm','Max Torque RPM','Kerb Weight','Seat Height mm',
     'Ground Clearance mm','Fuel Tank Litre','Wheel Base mm',
     'Front Tyres Size width in mm','Front Tyres Ratio in percentage',
     'Rear Tyres Size width in mm','Rear Tyres Ratio in percentage',
     'Fuel efficiency'
 ]
 
-# Clean numeric columns: remove stray chars and convert to float
 for col in numeric_cols:
     if col in df.columns:
         df[col] = pd.to_numeric(df[col].astype(str).str.replace('[^0-9\.\-]', '', regex=True), errors='coerce').fillna(0)
@@ -85,7 +92,7 @@ with col1:
 with col2:
     torque_min, torque_max = st.slider("Torque (Nm) range", int(df['Max Torque By Nm'].min()), int(df['Max Torque By Nm'].max()), (int(df['Max Torque By Nm'].min()), int(df['Max Torque By Nm'].max())))
 with col3:
-    weight_max = st.slider("Max kerb weight (kg)", int(df['Kerb Weight mm'].min()), int(df['Kerb Weight mm'].max()), int(df['Kerb Weight mm'].max()))
+    weight_max = st.slider("Max Kerb Weight (kg)", int(df['Kerb Weight'].min()), max(int(df['Kerb Weight'].max()),300), max(int(df['Kerb Weight'].max()),300))
 
 # -------------------- TERRAIN / PURPOSE MAP -------------------- #
 terrain_map = {
@@ -110,7 +117,7 @@ df_work = df.copy()
 df_work = df_work[(df_work['Price (Rs)'] >= budget[0]) & (df_work['Price (Rs)'] <= budget[1])]
 df_work = df_work[(df_work['Max power PS'] >= power_min) & (df_work['Max power PS'] <= power_max)]
 df_work = df_work[(df_work['Max Torque By Nm'] >= torque_min) & (df_work['Max Torque By Nm'] <= torque_max)]
-df_work = df_work[df_work['Kerb Weight mm'] <= weight_max]
+df_work = df_work[df_work['Kerb Weight'] <= weight_max]
 
 if filter_toggle:
     if brand_filter:
@@ -133,13 +140,25 @@ if filter_toggle:
 # -------------------- OPTIONAL METRIC FILTERS -------------------- #
 st.markdown('---')
 st.subheader("Optional Additional Metrics Filters")
-optional_metrics = ['Seat Height mm', 'Kerb Weight mm', 'Ground Clearance mm', 'Wheel Base mm', 'Fuel Tank Litre']
+optional_metrics = ['Seat Height mm', 'Kerb Weight', 'Ground Clearance mm', 'Wheel Base mm', 'Fuel Tank Litre', 'Fuel efficiency']
 user_metric_filters = {}
 for metric in optional_metrics:
+    if metric not in df_work.columns:
+        continue
     use_metric = st.checkbox(f"Filter by {metric}?", key=metric)
     if use_metric:
         min_val = int(df_work[metric].min())
-        max_val = int(df_work[metric].max())
+        # Set realistic max values for sliders
+        if metric == 'Seat Height mm':
+            max_val = max(int(df_work[metric].max()),900)
+        elif metric == 'Ground Clearance mm':
+            max_val = max(int(df_work[metric].max()),300)
+        elif metric == 'Wheel Base mm':
+            max_val = max(int(df_work[metric].max()),1600)
+        elif metric == 'Fuel Tank Litre':
+            max_val = max(int(df_work[metric].max()),35)
+        else:
+            max_val = int(df_work[metric].max())
         sel_range = st.slider(f"Select {metric} range", min_val, max_val, (min_val, max_val))
         user_metric_filters[metric] = sel_range
 for metric, (min_v, max_v) in user_metric_filters.items():
@@ -163,7 +182,7 @@ for i, row in df_work.iterrows():
         if bt in bike_type_input:
             df_work.at[i, 'User Type Match'] = 1
 
-# -------------------- NORMALIZATION FUNCTION -------------------- #
+# -------------------- NORMALIZATION -------------------- #
 def normalize_metric(df, column, max_value=None):
     if max_value is None:
         max_value = df[column].max()
@@ -184,7 +203,7 @@ custom_max = {
     'Max Torque RPM': 9000,
     'Ground Clearance mm': 300,
     'Wheel Base mm': 1600,
-    'Fuel Tank Litre': 25,
+    'Fuel Tank Litre': 35,
     'Front Tyres Size width in mm': 200,
     'Front Tyres Ratio in percentage': 100,
     'Rear Tyres Size width in mm': 200,
@@ -192,14 +211,15 @@ custom_max = {
 }
 
 for m in metrics_to_norm:
-    df_work = normalize_metric(df_work, m, custom_max.get(m))
+    if m in df_work.columns:
+        df_work = normalize_metric(df_work, m, custom_max.get(m))
 
 # -------------------- SCORES -------------------- #
 def ergonomic_score(row):
     inseam = rider_height * 0.45
-    seat_diff = abs(row['Seat Height mm'] - inseam)
+    seat_diff = abs(row.get('Seat Height mm',0) - inseam)
     seat_score = max(0, 100 - (seat_diff / inseam * 100))
-    weight_ratio = (row['Kerb Weight mm'] / max(1, rider_weight))
+    weight_ratio = (row.get('Kerb Weight',0) / max(1, rider_weight))
     if weight_ratio <= 0.9:
         weight_score = 100
     elif weight_ratio <= 1.4:
@@ -211,17 +231,13 @@ def ergonomic_score(row):
 
 def functional_score(row):
     s = 0
-    s += min(row['Engine Displacement_Norm'] / 100 * 15, 15)
-    s += min(row['Max power PS_Norm'] / 100 * 15, 15)
-    s += min(row['Max Torque By Nm_Norm'] / 100 * 12, 12)
-    s += min(row['Max power RPM_Norm'] / 100 * 6, 6)
-    s += min(row['Max Torque RPM_Norm'] / 100 * 6, 6)
-    s += min(row['Ground Clearance mm_Norm'] / 100 * 8, 8)
-    s += min(row['Wheel Base mm_Norm'] / 100 * 8, 8)
-    s += min(row['Fuel Tank Litre_Norm'] / 100 * 5, 5)
-    tyre_avg = ((row['Front Tyres Size width in mm_Norm'] * row['Front Tyres Ratio in percentage_Norm']) +
-                (row['Rear Tyres Size width in mm_Norm'] * row['Rear Tyres Ratio in percentage_Norm'])) / 2
-    s += min(tyre_avg / 100 * 10, 10)
+    for m, weight in [('Engine Displacement_Norm',15),('Max power PS_Norm',15),('Max Torque By Nm_Norm',12),
+                      ('Max power RPM_Norm',6),('Max Torque RPM_Norm',6),('Ground Clearance mm_Norm',8),
+                      ('Wheel Base mm_Norm',8),('Fuel Tank Litre_Norm',5)]:
+        s += min(row.get(m,0)/100*weight, weight)
+    tyre_avg = ((row.get('Front Tyres Size width in mm_Norm',0) * row.get('Front Tyres Ratio in percentage_Norm',0)) +
+                (row.get('Rear Tyres Size width in mm_Norm',0) * row.get('Rear Tyres Ratio in percentage_Norm',0)))/2
+    s += min(tyre_avg/100*10,10)
     return s
 
 def safety_score(row):
@@ -294,7 +310,7 @@ if len(compare_bikes) == 2:
     categories = ['Ergonomic','Functional','Safety','Value','Preference']
     values1 = [bike1[c] for c in categories]
     values2 = [bike2[c] for c in categories]
-    values1 += values1[:1]  # close the loop
+    values1 += values1[:1]
     values2 += values2[:1]
 
     angles = np.linspace(0, 2*np.pi, len(categories), endpoint=False).tolist()
