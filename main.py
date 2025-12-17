@@ -27,7 +27,11 @@ except Exception as e:
 # -------------------- CLEAN DATA -------------------- #
 df.columns = df.columns.str.strip()
 for c in df.select_dtypes(include=['object']).columns:
-    df[c] = df[c].astype(str).str.strip()
+    df[c] = df[c].astype(str).str.strip().str.replace('"','').str.replace("'",'')
+
+# Rename Kerb Weight for consistency
+if 'Kerb Weight kg' in df.columns:
+    df.rename(columns={'Kerb Weight kg':'Kerb Weight mm'}, inplace=True)
 
 numeric_cols = [
     'Price (Rs)','Engine Displacement','Max power PS','Max power RPM',
@@ -38,6 +42,7 @@ numeric_cols = [
     'Fuel efficiency'
 ]
 
+# Clean numeric columns: remove stray chars and convert to float
 for col in numeric_cols:
     if col in df.columns:
         df[col] = pd.to_numeric(df[col].astype(str).str.replace('[^0-9\.\-]', '', regex=True), errors='coerce').fillna(0)
@@ -165,7 +170,6 @@ def normalize_metric(df, column, max_value=None):
     df[column + '_Norm'] = (df[column] / max_value * 100).clip(0, 100)
     return df
 
-# -------------------- APPLY NORMALIZATION -------------------- #
 metrics_to_norm = [
     'Engine Displacement','Max power PS','Max Torque By Nm','Max power RPM','Max Torque RPM',
     'Ground Clearance mm','Wheel Base mm','Fuel Tank Litre','Front Tyres Size width in mm',
