@@ -239,7 +239,7 @@ st.subheader('Visual Comparisons')
 if not df_work.empty:
     top10 = df_work.sort_values('Total Score', ascending=False).head(10)
     fig, ax = plt.subplots(figsize=(8,4))
-    sns.barplot(x='Total Score',y='Bike Names',data=top10, palette="viridis")
+    sns.barplot(x='Total Score', y='Bike Names', data=top10, color="mediumseagreen")
     ax.set_xlabel('Total Score')
     ax.set_ylabel('Bike Names')
     ax.set_title('Top 10 Bikes by Total Score')
