@@ -158,6 +158,38 @@ for i, row in df_work.iterrows():
         if bt in bike_type_input:
             df_work.at[i, 'User Type Match'] = 1
 
+# -------------------- NORMALIZATION FUNCTION -------------------- #
+def normalize_metric(df, column, max_value=None):
+    if max_value is None:
+        max_value = df[column].max()
+    df[column + '_Norm'] = (df[column] / max_value * 100).clip(0, 100)
+    return df
+
+# -------------------- APPLY NORMALIZATION -------------------- #
+metrics_to_norm = [
+    'Engine Displacement','Max power PS','Max Torque By Nm','Max power RPM','Max Torque RPM',
+    'Ground Clearance mm','Wheel Base mm','Fuel Tank Litre','Front Tyres Size width in mm',
+    'Front Tyres Ratio in percentage','Rear Tyres Size width in mm','Rear Tyres Ratio in percentage'
+]
+
+custom_max = {
+    'Engine Displacement': 600,
+    'Max power PS': 60,
+    'Max Torque By Nm': 50,
+    'Max power RPM': 12000,
+    'Max Torque RPM': 9000,
+    'Ground Clearance mm': 300,
+    'Wheel Base mm': 1600,
+    'Fuel Tank Litre': 25,
+    'Front Tyres Size width in mm': 200,
+    'Front Tyres Ratio in percentage': 100,
+    'Rear Tyres Size width in mm': 200,
+    'Rear Tyres Ratio in percentage': 100
+}
+
+for m in metrics_to_norm:
+    df_work = normalize_metric(df_work, m, custom_max.get(m))
+
 # -------------------- SCORES -------------------- #
 def ergonomic_score(row):
     inseam = rider_height * 0.45
@@ -175,17 +207,17 @@ def ergonomic_score(row):
 
 def functional_score(row):
     s = 0
-    s += min(row['Engine Displacement'] / 600 * 15, 15)
-    s += min(row['Max power PS'] / 60 * 15, 15)
-    s += min(row['Max Torque By Nm'] / 50 * 12, 12)
-    s += min(row['Max power RPM'] / 12000 * 6, 6)
-    s += min(row['Max Torque RPM'] / 9000 * 6, 6)
-    s += min(row['Ground Clearance mm'] / 300 * 8, 8)
-    s += min(row['Wheel Base mm'] / 1600 * 8, 8)
-    s += min(row['Fuel Tank Litre'] / 25 * 5, 5)
-    tyre_avg = ((row['Front Tyres Size width in mm'] * row['Front Tyres Ratio in percentage']) +
-                (row['Rear Tyres Size width in mm'] * row['Rear Tyres Ratio in percentage'])) / 2
-    s += min(tyre_avg / 20000 * 10, 10)
+    s += min(row['Engine Displacement_Norm'] / 100 * 15, 15)
+    s += min(row['Max power PS_Norm'] / 100 * 15, 15)
+    s += min(row['Max Torque By Nm_Norm'] / 100 * 12, 12)
+    s += min(row['Max power RPM_Norm'] / 100 * 6, 6)
+    s += min(row['Max Torque RPM_Norm'] / 100 * 6, 6)
+    s += min(row['Ground Clearance mm_Norm'] / 100 * 8, 8)
+    s += min(row['Wheel Base mm_Norm'] / 100 * 8, 8)
+    s += min(row['Fuel Tank Litre_Norm'] / 100 * 5, 5)
+    tyre_avg = ((row['Front Tyres Size width in mm_Norm'] * row['Front Tyres Ratio in percentage_Norm']) +
+                (row['Rear Tyres Size width in mm_Norm'] * row['Rear Tyres Ratio in percentage_Norm'])) / 2
+    s += min(tyre_avg / 100 * 10, 10)
     return s
 
 def safety_score(row):
@@ -245,7 +277,7 @@ if not df_work.empty:
     ax.set_title('Top 10 Bikes by Total Score')
     st.pyplot(fig)
 
-# -------------------- OPTIONAL FEATURE: RADAR COMPARISON -------------------- #
+# -------------------- RADAR CHART -------------------- #
 st.markdown('---')
 st.subheader("Compare Any 2 Bikes (Radar Chart)")
 
