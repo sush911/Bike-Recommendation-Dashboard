@@ -79,7 +79,8 @@ with st.expander("📊 **Research Methodology & System Logic**"):
     - BMI calculated for reference but not scored (acknowledged limitation)
     
     **2. Functional Score (30%)** - Performance specifications
-    - Engine: displacement, power, torque (45%)
+    - Engine: displacement, power, torque (40%)
+    - Fuel Economy (5%): fuel efficiency for cost-effectiveness
     - Chassis: ground clearance, wheelbase, fuel capacity (30%)
     - Tires: width and aspect ratio (15%)
     - RPM characteristics (10%)
@@ -99,6 +100,7 @@ with st.expander("📊 **Research Methodology & System Logic**"):
     - Brand filter available but flagged as potential marketing bias source
     - Terrain/purpose matching uses bike type data to answer RQ1 about specs
     - System prioritizes measurable specifications over subjective preferences
+    - **NEW**: Fuel efficiency integrated into functional scoring for real-world cost considerations
     
     **Acknowledged Limitations:**
     - Weight ratios use simplified thresholds (need empirical validation)
@@ -433,13 +435,16 @@ def calculate_ergonomic_score(row, rider_height_mm, rider_weight, inseam_mm):
 
 
 def calculate_functional_score(row):
-    """Functional scoring based on bike specifications"""
+    """Functional scoring based on bike specifications - NOW INCLUDES FUEL EFFICIENCY"""
     score = 0
     
-    # Engine Performance (45 points)
-    score += row.get('Engine Displacement_Norm', 0) * 0.15
-    score += row.get('Max power PS_Norm', 0) * 0.18
-    score += row.get('Max Torque By Nm_Norm', 0) * 0.12
+    # Engine Performance (40 points) - REDUCED from 45
+    score += row.get('Engine Displacement_Norm', 0) * 0.13
+    score += row.get('Max power PS_Norm', 0) * 0.16
+    score += row.get('Max Torque By Nm_Norm', 0) * 0.11
+    
+    # Fuel Efficiency (5 points) - NEWLY ADDED
+    score += row.get('Fuel efficiency_Norm', 0) * 0.05
     
     # RPM characteristics (10 points)
     score += row.get('Max power RPM_Norm', 0) * 0.05
@@ -975,12 +980,18 @@ else:
 # ==================== FOOTER ==================== #
 st.markdown("---")
 st.markdown("""
-### 📚 Research Context
+### 📚 Research Context & Updates
 This system addresses:
 - **RQ1**: Specifications influence through weighted functional scoring
 - **RQ2**: Rider characteristics impact via ergonomic matching (height→seat, weight→handling)
 - **H1**: Spec-based matching vs brand preference (use without brand filter to test)
 - **H2**: Reducing bias by prioritizing measurable specs over marketing factors
+
+**🆕 Version 2.1 Updates:**
+- ✅ **Fuel efficiency now integrated into Functional Score (5% weight)**
+- Rebalanced engine performance from 45% to 40% to accommodate fuel efficiency
+- All available data columns now utilized in scoring system
+- Improved real-world relevance for budget-conscious young riders
 
 **Next Steps for Validation:**
 1. Survey users: satisfaction with recommendations vs traditional choice
@@ -988,6 +999,5 @@ This system addresses:
 3. Track actual purchases and long-term satisfaction
 4. Validate weight ratio thresholds with rider interviews
 
-*Dashboard Version 2.0 - Complete Data Utilization - No Warnings*
+*Dashboard Version  - Complete Data Utilization with Fuel Efficiency Integration*
 """)
-
