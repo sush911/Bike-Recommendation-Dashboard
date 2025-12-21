@@ -599,35 +599,47 @@ else:
     # Top 15 recommendations
     top_15 = df_filtered.head(15)
     
-    # Display columns
-    display_cols = ['Bike Names', 'Brand', 'Bike Type', 'Price (Rs)', 
-                    'Total Score', 'Ergonomic Score', 'Functional Score', 
-                    'Safety Score', 'Terrain/Purpose Score', 'Value Score',
-                    'Engine Displacement', 'Max power PS', 'Max Torque By Nm',
-                    'Seat Height mm', 'Kerb Weight', 'Ground Clearance mm', 
-                    'Fuel Tank Litre', 'Fuel efficiency']
+    # Display ALL columns - scores first, then all bike specs
+    score_cols = ['Total Score', 'Ergonomic Score', 'Functional Score', 
+                  'Safety Score', 'Terrain/Purpose Score', 'Value Score']
     
-    # Filter to existing columns
-    display_cols = [col for col in display_cols if col in top_15.columns]
+    # Get all original columns except normalized ones
+    original_cols = [col for col in top_15.columns if not col.endswith('_Norm')]
+    
+    # Remove score columns from original list to avoid duplication
+    spec_cols = [col for col in original_cols if col not in score_cols]
+    
+    # Reorder: Bike Names first, then Brand, Type, Price, then Scores, then all other specs
+    priority_cols = ['Bike Names', 'Brand', 'Bike Type', 'Price (Rs)']
+    display_cols = []
+    
+    # Add priority columns that exist
+    for col in priority_cols:
+        if col in spec_cols:
+            display_cols.append(col)
+            spec_cols.remove(col)
+    
+    # Add score columns
+    display_cols.extend([col for col in score_cols if col in top_15.columns])
+    
+    # Add all remaining specification columns
+    display_cols.extend(spec_cols)
+    
+    # Create format dictionary for all numeric columns
+    format_dict = {}
+    for col in display_cols:
+        if col in top_15.columns:
+            if 'Price' in col:
+                format_dict[col] = '{:,.0f}'
+            elif 'Score' in col:
+                format_dict[col] = '{:.1f}'
+            elif top_15[col].dtype in ['float64', 'float32']:
+                format_dict[col] = '{:.1f}'
+            elif top_15[col].dtype in ['int64', 'int32']:
+                format_dict[col] = '{:.0f}'
     
     st.dataframe(
-        top_15[display_cols].style.format({
-            'Price (Rs)': '{:,.0f}',
-            'Total Score': '{:.1f}',
-            'Ergonomic Score': '{:.1f}',
-            'Functional Score': '{:.1f}',
-            'Safety Score': '{:.1f}',
-            'Terrain/Purpose Score': '{:.1f}',
-            'Value Score': '{:.1f}',
-            'Engine Displacement': '{:.0f}',
-            'Max power PS': '{:.1f}',
-            'Max Torque By Nm': '{:.1f}',
-            'Seat Height mm': '{:.0f}',
-            'Kerb Weight': '{:.0f}',
-            'Ground Clearance mm': '{:.0f}',
-            'Fuel Tank Litre': '{:.1f}',
-            'Fuel efficiency': '{:.1f}'
-        }).background_gradient(subset=['Total Score'], cmap='Greens'),
+        top_15[display_cols].style.format(format_dict).background_gradient(subset=['Total Score'], cmap='Greens'),
         width='stretch',
         height=500
     )
@@ -987,7 +999,7 @@ This system addresses:
 - **H1**: Spec-based matching vs brand preference (use without brand filter to test)
 - **H2**: Reducing bias by prioritizing measurable specs over marketing factors
 
-**🆕 Version 2.1 Updates:**
+**🆕 Version  Updates:**
 - ✅ **Fuel efficiency now integrated into Functional Score (5% weight)**
 - Rebalanced engine performance from 45% to 40% to accommodate fuel efficiency
 - All available data columns now utilized in scoring system
